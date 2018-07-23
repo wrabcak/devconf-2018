@@ -1,0 +1,84 @@
+- hosts: fedora-devconf
+  become: yes
+  become_user: root
+  vars:
+      firewall:
+          - { port: '7070/tcp', state: 'enabled' }
+          - { port: '9090/tcp', state: 'enabled' }
+          - { port: '80/tcp', state: 'enabled' }
+          - { port: '22/tcp', state: 'enabled' }
+  pre_tasks:
+      - name: Install packages
+        package:
+            state: present
+            name: "{{ item }}"
+        with_items:
+            - httpd
+            - libselinux-python
+            - setroubleshoot-server
+  tasks:
+      - name: Install cockpit on rhel-7 machine only
+        when: ansible_default_ipv4.address == "192.168.122.163"
+        package:
+            state: present
+            name: "{{ item }}"
+        with_items:
+            - cockpit-ws
+            - cockpit-bridge
+            - cockpit-system
+            - cockpit
+      - name: Disable SELinux :(
+        selinux:
+            state: disabled
+      - name: Install httpd config files
+        template:
+            src: files/www_net.conf.rhel7
+            dest: /etc/httpd/conf.d/www_net.conf
+      - name:
+        service:
+            name: httpd
+            state: restarted
+      - name: Enable httpd service
+        service:
+            name: httpd
+            enabled: yes
+      - name: Create custom www document root
+        file:
+            path: /var/www_new/html/
+            state: directory
+            mode: 0755
+            owner: root
+            group: root
+      - name: Create dir stored in homedir
+        file:
+            path: /root/my_web/
+            state: directory
+            mode: 0755
+            owner: root
+            group: root
+      - name: Create custom webpage
+        copy:
+            content: "<center><h1>Secret webpage! "
+            dest: /var/www_new/html/index.html
+            force: yes
+      - name: Create default webpage
+        copy:
+            content: "<center><h1>Hello devconf India! "
+            dest: /root/my_web/index.html
+
+      - name: Remove welcome page from httpd
+        file:
+            dest: /etc/httpd/conf.d/welcome.conf
+            state: absent
+      - name: Start cockpit on rhel7-devconf
+        when: ansible_default_ipv4.address == "192.168.122.163"
+        service:
+            name: cockpit
+            enabled: yes
+            state: started
+      - name: Reboot machine
+        shell: sleep 1 && /sbin/shutdown -r now
+        async: 1
+        ignore_errors: yes
+  roles:
+      - linux-system-roles.firewall

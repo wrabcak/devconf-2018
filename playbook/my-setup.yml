@@ -1,0 +1,12 @@
+---
+selinux_purge_all: true
+selinux_policy: targeted
+selinux_state: enforcing
+selinux_all_purge: true
+selinux_fcontexts:
+  - { target: '/var/www_new(/.*)?', setype: 'httpd_sys_content_t', ftype: 'a' }
+selinux_restore_dirs:
+  - /var/www/html
+  - /var/www_new/
+selinux_ports:
+  - { ports: '7070', proto: 'tcp', setype: 'http_port_t', state: 'present' }

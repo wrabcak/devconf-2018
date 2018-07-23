@@ -1,0 +1,44 @@
+---
+- hosts: rhel7-2-devconf, rhel6-devconf, fedora-devconf
+  become: true
+  become_user: root
+
+  pre_tasks:
+  - name: Copy default page to right place
+    copy:
+        mode: 0755
+        owner: apache
+        group: apache
+        remote_src: yes
+        src: /root/my_web/index.html
+        dest: /var/www/html/index.html
+  - name: Enable SELinux and reboot when SELinux is disabled
+    block:
+      - name: Enable SELinux
+        selinux:
+          policy: targeted
+          state: permissive
+      - name: Reboot the machine
+        shell: sleep 2 && shutdown -r now
+        async: 1
+        poll: 0
+      - name: Wait for machine to come back
+        wait_for:
+          port: 22
+          host: "{{ ansible_default_ipv4.address }}"
+          delay: 5
+          timeout: 300
+        delegate_to: localhost
+        become: false
+      - name: Gather new facts
+        setup:
+      - debug:
+          msg: "SELinux status = {{ ansible_selinux.status }}"
+    when: ansible_selinux.status == "disabled"
+
+  vars_files:
+    - my-setup.yml
+ 
+  roles:
+    - linux-system-roles.selinux
+
